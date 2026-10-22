@@ -1,0 +1,6 @@
+/** Replaces `{name}` placeholders, e.g. interpolate("Hi {name}", { name: "Dara" }). */
+export function interpolate(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in values ? String(values[key]) : match,
+  );
+}

@@ -19,6 +19,10 @@ import {
   type ResetPasswordInput,
 } from "./schemas";
 
+function authErrorMeta(error: { name: string; message: string; code?: string; status?: number }) {
+  return { name: error.name, code: error.code, status: error.status, detail: error.message };
+}
+
 function callbackUrl(next: string): string {
   const { NEXT_PUBLIC_SITE_URL } = getPublicEnv();
   const url = new URL("/auth/callback", NEXT_PUBLIC_SITE_URL);
@@ -36,7 +40,7 @@ export async function loginAction(input: LoginInput, next?: string): Promise<Act
   if (error) {
     // Wrong passwords are expected; only log unexpected failures.
     if (error.code !== "invalid_credentials") {
-      logger.warn("auth.login", "Sign-in failed", { code: error.code, status: error.status });
+      logger.warn("auth.login", "Sign-in failed", authErrorMeta(error));
     }
     return fail(t.auth.errors[authErrorKey(error)]);
   }
@@ -63,7 +67,7 @@ export async function registerAction(
   });
 
   if (error) {
-    logger.warn("auth.register", "Sign-up failed", { code: error.code, status: error.status });
+    logger.warn("auth.register", "Sign-up failed", authErrorMeta(error));
     return fail(t.auth.errors[authErrorKey(error)]);
   }
 
@@ -85,7 +89,7 @@ export async function forgotPasswordAction(input: ForgotPasswordInput): Promise<
   });
 
   if (error) {
-    logger.warn("auth.forgot-password", "Reset email failed", { code: error.code, status: error.status });
+    logger.warn("auth.forgot-password", "Reset email failed", authErrorMeta(error));
     // Only rate limiting is surfaced; anything else returns the same success
     // response so the form cannot be used to discover registered emails.
     if (authErrorKey(error) === "rateLimited") return fail(t.auth.errors.rateLimited);
@@ -105,7 +109,7 @@ export async function resetPasswordAction(input: ResetPasswordInput): Promise<Ac
 
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) {
-    logger.warn("auth.reset-password", "Password update failed", { code: error.code, status: error.status });
+    logger.warn("auth.reset-password", "Password update failed", authErrorMeta(error));
     return fail(t.auth.errors[authErrorKey(error)]);
   }
 

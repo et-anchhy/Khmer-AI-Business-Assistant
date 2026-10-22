@@ -19,5 +19,7 @@ export function authErrorKey(error: { code?: string; status?: number } | null | 
       return "rateLimited";
   }
   if (error?.status === 429) return "rateLimited";
+  // supabase-js reports network failures (DNS, timeout, offline) as status 0.
+  if (error?.status === 0) return "unavailable";
   return "generic";
 }

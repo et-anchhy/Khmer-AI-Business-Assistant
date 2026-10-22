@@ -25,7 +25,7 @@ export const navItems: NavItem[] = [
   { key: "orders", href: "/dashboard/orders", icon: ShoppingCart, available: false },
   { key: "customers", href: "/dashboard/customers", icon: Users, available: false },
   { key: "knowledge", href: "/dashboard/knowledge", icon: BookOpen, available: false },
-  { key: "settings", href: "/dashboard/settings", icon: Settings, available: false },
+  { key: "settings", href: "/dashboard/settings", icon: Settings, available: true },
 ];
 
 export function isNavItemActive(item: NavItem, pathname: string): boolean {

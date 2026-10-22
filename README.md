@@ -2,25 +2,27 @@
 
 A bilingual (Khmer / English) business workspace for Cambodian small businesses such as clothing shops, online sellers, cafés, beauty salons and electronics shops. Owners manage their business profile, products, customers, orders and a knowledge base. An AI assistant answers questions in Khmer or English using **only that business's own data**.
 
-> **Status: Phase 1 of 10 is complete** (project setup, UI system, authentication). See [Roadmap](#roadmap). Sections marked _(Phase N)_ describe work that is planned but not built yet.
+> **Status: Phases 1–2 of 10 are complete** (setup, UI system, authentication, database schema with RLS, business onboarding and settings). See [Roadmap](#roadmap). Sections marked _(Phase N)_ describe work that is planned but not built yet.
 
 ---
 
 ## Features
 
-| Area | Status |
-| --- | --- |
+| Area                                                                    | Status     |
+| ----------------------------------------------------------------------- | ---------- |
 | Email/password auth: register, login, logout, forgot and reset password | ✅ Phase 1 |
-| Protected dashboard routes (proxy redirect plus a server-side check) | ✅ Phase 1 |
-| Khmer / English interface with a language switcher | ✅ Phase 1 |
-| Responsive dashboard shell: sidebar on desktop, drawer on mobile | ✅ Phase 1 |
-| Business profile and onboarding | Phase 2 |
-| Products with images, stock and low-stock warnings | Phase 3 |
-| Knowledge base (FAQ, delivery, return and payment policies) | Phase 4 |
-| AI assistant grounded in business data, with saved conversations | Phase 5 |
-| Customers with order history | Phase 6 |
-| Orders with inventory-safe status changes | Phase 7 |
-| Dashboard analytics | Phase 8 |
+| Protected dashboard routes (proxy redirect plus a server-side check)    | ✅ Phase 1 |
+| Khmer / English interface with a language switcher                      | ✅ Phase 1 |
+| Responsive dashboard shell: sidebar on desktop, drawer on mobile        | ✅ Phase 1 |
+| Database schema with Row Level Security, plus cross-business isolation tests | ✅ Phase 2 |
+| Business onboarding and settings                                        | ✅ Phase 2 |
+| Demo seed data (Angkor Fashion)                                         | ✅ Phase 2 |
+| Products with images, stock and low-stock warnings                      | Phase 3    |
+| Knowledge base (FAQ, delivery, return and payment policies)             | Phase 4    |
+| AI assistant grounded in business data, with saved conversations        | Phase 5    |
+| Customers with order history                                            | Phase 6    |
+| Orders with inventory-safe status changes                               | Phase 7    |
+| Dashboard analytics                                                     | Phase 8    |
 
 ## Tech stack
 
@@ -34,7 +36,7 @@ A bilingual (Khmer / English) business workspace for Cambodian small businesses 
 
 ## Requirements
 
-- Node.js **20.9+** (developed on Node 24)
+- Node.js **22+** (developed on Node 24)
 - npm 10+
 - A Supabase project (the free tier is fine)
 - An OpenAI API key _(needed from Phase 5)_
@@ -50,14 +52,15 @@ cp .env.example .env.local   # then fill in the values
 
 ## Environment variables
 
-| Variable | Where it is used | Secret? |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Browser and server | No |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser and server. Accepts either the anon key or a `sb_publishable_…` key. RLS protects all data. | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server only: seed script and isolation tests. Bypasses RLS. | **Yes** |
-| `NEXT_PUBLIC_SITE_URL` | Base URL for links in auth emails | No |
-| `OPENAI_API_KEY` | Server only, AI assistant _(Phase 5)_ | **Yes** |
-| `OPENAI_MODEL` | Server only. Optional, defaults to `gpt-4.1-mini`. | No |
+| Variable                          | Where it is used                                                                                       | Secret?       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Browser and server                                                                                     | No            |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser and server. Accepts either the anon key or a `sb_publishable_…` key. RLS protects all data. | No            |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Server only: seed script and isolation tests. Bypasses RLS.                                            | **Yes** |
+| `NEXT_PUBLIC_SITE_URL`          | Base URL for links in auth emails                                                                      | No            |
+| `OPENAI_API_KEY`                | Server only, AI assistant _(Phase 5)_                                                                | **Yes** |
+| `OPENAI_MODEL`                  | Server only. Optional, defaults to `gpt-4.1-mini`.                                                   | No            |
+| `SEED_DEMO_PASSWORD`            | Seed script only. Optional demo password.                                                             | No            |
 
 Server-only secrets are read through `lib/env.server.ts`, which imports `server-only`. If a Client Component imports it, the build fails, so these values cannot be bundled for the browser. Never commit `.env.local`.
 
@@ -75,9 +78,17 @@ Server-only secrets are read through `lib/env.server.ts`, which imports `server-
 
 Supabase's default email templates work as-is: `/auth/callback` handles both the PKCE `?code=` links and `?token_hash=&type=` links.
 
-### Database migrations _(Phase 2)_
+### Database migrations
 
-SQL migrations will live in `supabase/migrations/`. They will be applied with the Supabase CLI:
+Migrations live in `supabase/migrations/` and run in filename order:
+
+| File | Contents |
+| --- | --- |
+| `…_initial_schema.sql` | Enums, tables, constraints, indexes, `updated_at` triggers, profile-on-signup trigger, per-business order numbers |
+| `…_row_level_security.sql` | `is_business_owner()` helper, RLS policies on every table, column-level grants, no access for `anon` |
+| `…_storage.sql` | `product-images` bucket (5 MB, JPEG/PNG/WebP); uploads allowed only under `<business_id>/` |
+
+**Option A: Supabase CLI**
 
 ```bash
 npx supabase login
@@ -85,7 +96,17 @@ npx supabase link --project-ref <your-project-ref>
 npx supabase db push
 ```
 
-You can also paste each migration into **SQL Editor** in order.
+**Option B: SQL Editor.** Paste each file into **SQL Editor** in order and run it.
+
+After changing the schema, update `types/database.ts`. You can regenerate it with `npx supabase gen types typescript --linked > types/database.ts`.
+
+### Demo data
+
+```bash
+npm run seed -- --yes
+```
+
+This creates the fictional **Angkor Fashion** business with 8 products, 5 customers, 6 orders and 8 knowledge-base entries, mixing Khmer and English. You can log in as `demo@angkor-fashion.test` with password `angkor-demo-2026` (override it with `SEED_DEMO_PASSWORD`). The script needs the service-role key and refuses to run with `NODE_ENV=production`. Re-running it deletes and recreates the demo business. Use it only in development projects.
 
 ## OpenAI setup _(Phase 5)_
 
@@ -95,10 +116,16 @@ Create a key at [platform.openai.com](https://platform.openai.com/api-keys) and 
 
 ```bash
 npm run dev          # http://localhost:3000
-npm test             # unit tests (Vitest)
+npm test             # unit + database tests (Vitest)
 npm run typecheck    # TypeScript
 npm run lint         # ESLint
 ```
+
+### Tests
+
+`npm test` needs no Supabase project or Docker. The database tests in `tests/db/` start an in-memory Postgres ([PGlite](https://pglite.dev)), load a small stand-in for Supabase's `auth`/`storage` schemas and roles, apply every migration, and then query as the `authenticated` role with JWT claims set. That is the same path the Supabase API uses.
+
+`tests/db/rls-isolation.test.ts` is the key security test. It checks that a user from Business A cannot read, update, delete, insert into, re-parent rows into, or link to Business B's products, customers, orders, order items, knowledge base, conversations, messages or images.
 
 ## Building for production
 
@@ -112,7 +139,8 @@ npm start
 1. Import the repository in Vercel.
 2. Add every variable from `.env.example`. Set `NEXT_PUBLIC_SITE_URL` to your production URL.
 3. In Supabase, add `https://<your-domain>/auth/callback` to Redirect URLs and update the Site URL.
-4. Deploy.
+4. Apply the migrations to the production project (`npx supabase db push`). Do not run the seed there.
+5. Deploy.
 
 Any Node host that runs `next start` also works.
 
@@ -122,13 +150,15 @@ Any Node host that runs `next start` also works.
 app/                      Routes only: thin pages that compose features
   (auth)/                 login, register, forgot-password, reset-password
   auth/callback/          Route handler for links in auth emails
-  dashboard/              Protected app (layout re-checks the session server-side)
+  onboarding/             Business setup for new accounts
+  dashboard/              Protected app (layout requires a user *and* a business)
 components/
   ui/                     shadcn/ui primitives
   layout/                 App shell, sidebar, navigation config, page header
-  form/                   Text field, password input, submit button
+  form/                   Text field, generic form field, password input, submit button
 features/<feature>/       Feature code: schemas, server actions, components
   auth/
+  business/               Onboarding/settings form, schema, actions
   i18n/
 lib/
   supabase/               Browser, server and proxy Supabase clients
@@ -136,10 +166,13 @@ lib/
   i18n/                   Locale config, dictionaries (en, km), server/client access
   ai/                     AI service (Phase 5)
   env.ts / env.server.ts  Validated public config / server-only secrets
-services/                 Data-access services per domain (Phase 2+)
-hooks/  types/  utils/
+services/                 Data access per domain; takes the request's RLS-bound client
+types/database.ts         Typed schema for supabase-js
+supabase/migrations/      SQL migrations (schema, RLS, storage)
+scripts/                  Demo seed script and data
+hooks/  utils/
 proxy.ts                  Session refresh and route guard (Next.js 16 "proxy", formerly middleware)
-tests/                    Vitest unit tests
+tests/                    Vitest unit tests; tests/db/ = migrations + RLS on PGlite
 ```
 
 ### Localization
@@ -149,8 +182,11 @@ UI strings live in `lib/i18n/dictionaries/`. `en.ts` defines the shape and `km.t
 ## Security model
 
 - **Proxy (`proxy.ts`)** refreshes the session and redirects signed-out users. This is only an optimistic check.
-- **Server-side checks**: protected layouts, pages and actions call `requireUser()`, which verifies the session with Supabase Auth.
-- **Database**: Row Level Security on every business-owned table is the real boundary _(Phase 2)_.
+- **Server-side checks**: protected layouts, pages and actions call `requireUser()` / `requireBusiness()`. These verify the session with Supabase Auth and load the user's business. Server code takes the business ID only from there, never from the request.
+- **Database (the real boundary)**: RLS is enabled on every table. A row is visible or writable only when `is_business_owner(business_id)` is true. `anon` has no table access.
+- **Composite foreign keys**: child rows reference `(id, business_id)` of their parent, so an order item, message or order can't point at another business's data.
+- **Column grants**: owners can't change `owner_id` or the order counter, and order numbers are always assigned by a trigger.
+- **Storage**: uploads must sit under the uploader's own `<business_id>/` folder.
 - `?next=` redirects are restricted to same-origin paths (`safeRedirectPath`), so they cannot be used as open redirects.
 - The forgot-password flow gives the same response whether or not an account exists, so it cannot be used to discover emails.
 - Users see friendly error messages. Details are logged server-side via `lib/logger.ts`, without passwords or tokens.
@@ -158,7 +194,7 @@ UI strings live in `lib/i18n/dictionaries/`. `en.ts` defines the shape and `km.t
 ## Roadmap
 
 1. ✅ Project setup, UI system, authentication
-2. Database schema, RLS, business profile, onboarding
+2. ✅ Database schema, RLS, business profile, onboarding
 3. Product management and image upload
 4. Knowledge base
 5. AI assistant (grounded retrieval, conversation history)
@@ -167,3 +203,7 @@ UI strings live in `lib/i18n/dictionaries/`. `en.ts` defines the shape and `km.t
 8. Dashboard analytics
 9. Localization and responsive polish
 10. Security tests, error handling, deployment prep
+
+
+
+

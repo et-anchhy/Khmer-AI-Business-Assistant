@@ -6,6 +6,7 @@ export const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/reset-password
 
 export const LOGIN_PATH = "/login";
 export const DEFAULT_AUTHENTICATED_PATH = "/dashboard";
+export const ONBOARDING_PATH = "/onboarding";
 
 function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);

@@ -4,9 +4,15 @@ import { z } from "zod";
  * Public (browser-safe) configuration. Each variable is referenced literally so
  * Next.js can inline it into the client bundle.
  */
+// Values copied unchanged from .env.example.
+const isPlaceholder = (value: string) => value.includes("your-project-ref") || value.startsWith("your-");
+
 const publicEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_SUPABASE_URL: z.url().refine((v) => !isPlaceholder(v), "still the .env.example placeholder"),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z
+    .string()
+    .min(1)
+    .refine((v) => !isPlaceholder(v), "still the .env.example placeholder"),
   NEXT_PUBLIC_SITE_URL: z.url().default("http://localhost:3000"),
 });
 
@@ -24,8 +30,8 @@ export function getPublicEnv(): PublicEnv {
   });
 
   if (!parsed.success) {
-    const missing = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
-    throw new Error(`Invalid or missing environment variables: ${missing}. See .env.example.`);
+    const problems = parsed.error.issues.map((issue) => `${issue.path.join(".")} (${issue.message})`).join(", ");
+    throw new Error(`Invalid or missing environment variables: ${problems}. Set them in .env.local — see .env.example.`);
   }
 
   cached = parsed.data;

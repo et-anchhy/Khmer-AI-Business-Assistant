@@ -8,21 +8,21 @@ A bilingual (Khmer / English) business workspace for Cambodian small businesses 
 
 ## Features
 
-| Area                                                                    | Status     |
-| ----------------------------------------------------------------------- | ---------- |
-| Email/password auth: register, login, logout, forgot and reset password | ✅ Phase 1 |
-| Protected dashboard routes (proxy redirect plus a server-side check)    | ✅ Phase 1 |
-| Khmer / English interface with a language switcher                      | ✅ Phase 1 |
-| Responsive dashboard shell: sidebar on desktop, drawer on mobile        | ✅ Phase 1 |
-| Database schema with Row Level Security, plus cross-business isolation tests | ✅ Phase 2 |
-| Business onboarding and settings                                        | ✅ Phase 2 |
-| Demo seed data (Angkor Fashion)                                         | ✅ Phase 2 |
-| Products: search, filters, photos, stock updates, low-stock warnings | ✅ Phase 3 |
+| Area                                                                           | Status     |
+| ------------------------------------------------------------------------------ | ---------- |
+| Email/password auth: register, login, logout, forgot and reset password        | ✅ Phase 1 |
+| Protected dashboard routes (proxy redirect plus a server-side check)           | ✅ Phase 1 |
+| Khmer / English interface with a language switcher                             | ✅ Phase 1 |
+| Responsive dashboard shell: sidebar on desktop, drawer on mobile               | ✅ Phase 1 |
+| Database schema with Row Level Security, plus cross-business isolation tests   | ✅ Phase 2 |
+| Business onboarding and settings                                               | ✅ Phase 2 |
+| Demo seed data (Angkor Fashion)                                                | ✅ Phase 2 |
+| Products: search, filters, photos, stock updates, low-stock warnings           | ✅ Phase 3 |
 | Knowledge base: FAQs and policies, search, category filter, guided empty state | ✅ Phase 4 |
-| Bilingual AI assistant grounded in business data, with saved conversations | ✅ Phase 5 |
-| Customers with order history                                            | Phase 6    |
-| Orders with inventory-safe status changes                               | Phase 7    |
-| Dashboard analytics                                                     | Phase 8    |
+| Bilingual AI assistant grounded in business data, with saved conversations     | ✅ Phase 5 |
+| Customers with order history                                                   | Phase 6    |
+| Orders with inventory-safe status changes                                      | Phase 7    |
+| Dashboard analytics                                                            | Phase 8    |
 
 ## Tech stack
 
@@ -60,7 +60,7 @@ cp .env.example .env.local   # then fill in the values
 | `NEXT_PUBLIC_SITE_URL`          | Base URL for links in auth emails                                                                      | No            |
 | `OPENAI_API_KEY`                | Server only, AI assistant _(Phase 5)_                                                                | **Yes** |
 | `OPENAI_MODEL`                  | Server only. Optional, defaults to `gpt-4.1-mini`.                                                   | No            |
-| `SEED_DEMO_PASSWORD`            | Seed script only. Optional demo password.                                                             | No            |
+| `SEED_DEMO_PASSWORD`            | Seed script only. Optional demo password.                                                              | No            |
 
 Server-only secrets are read through `lib/env.server.ts`, which imports `server-only`. If a Client Component imports it, the build fails, so these values cannot be bundled for the browser. Never commit `.env.local`.
 
@@ -82,13 +82,13 @@ Supabase's default email templates work as-is: `/auth/callback` handles both the
 
 Migrations live in `supabase/migrations/` and run in filename order:
 
-| File | Contents |
-| --- | --- |
-| `…_initial_schema.sql` | Enums, tables, constraints, indexes, `updated_at` triggers, profile-on-signup trigger, per-business order numbers |
-| `…_row_level_security.sql` | `is_business_owner()` helper, RLS policies on every table, column-level grants, no access for `anon` |
-| `…_storage.sql` | `product-images` bucket (5 MB, JPEG/PNG/WebP); uploads allowed only under `<business_id>/` |
-| `…_product_stock.sql` | `adjust_product_stock()`: atomic stock change that respects RLS and never goes below 0 |
-| `…_conversation_activity.sql` | A new message moves its conversation to the top of the list |
+| File                             | Contents                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `…_initial_schema.sql`        | Enums, tables, constraints, indexes, `updated_at` triggers, profile-on-signup trigger, per-business order numbers |
+| `…_row_level_security.sql`    | `is_business_owner()` helper, RLS policies on every table, column-level grants, no access for `anon`            |
+| `…_storage.sql`               | `product-images` bucket (5 MB, JPEG/PNG/WebP); uploads allowed only under `<business_id>/`                      |
+| `…_product_stock.sql`         | `adjust_product_stock()`: atomic stock change that respects RLS and never goes below 0                            |
+| `…_conversation_activity.sql` | A new message moves its conversation to the top of the list                                                         |
 
 **Option A: Supabase CLI**
 
@@ -151,6 +151,7 @@ npx supabase start     # starts Postgres/Auth/Storage locally and applies all mi
 Copy the printed API URL, publishable key and secret key into `.env.local` as `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. Then run `npm run seed -- --yes` and `npm run dev`.
 
 Other local tools:
+
 - Studio: http://127.0.0.1:54323
 - Mailpit (catches sign-up and reset emails): http://127.0.0.1:54324
 
@@ -222,7 +223,6 @@ UI strings live in `lib/i18n/dictionaries/`. `en.ts` defines the shape and `km.t
 ## Security model
 
 - **AI isolation**: the AI retriever only ever loads rows for the session's business, and RLS enforces the same rule underneath. In the live end-to-end test, a second business's products and FAQs never appeared in the first business's prompts.
-
 - **Proxy (`proxy.ts`)** refreshes the session and redirects signed-out users. This is only an optimistic check.
 - **Server-side checks**: protected layouts, pages and actions call `requireUser()` / `requireBusiness()`. These verify the session with Supabase Auth and load the user's business. Server code takes the business ID only from there, never from the request.
 - **Database (the real boundary)**: RLS is enabled on every table. A row is visible or writable only when `is_business_owner(business_id)` is true. `anon` has no table access.
@@ -239,15 +239,12 @@ UI strings live in `lib/i18n/dictionaries/`. `en.ts` defines the shape and `km.t
 
 1. ✅ Project setup, UI system, authentication
 2. ✅ Database schema, RLS, business profile, onboarding
-3. Product management and image upload
-4. Knowledge base
-5. AI assistant (grounded retrieval, conversation history)
+3. ✅ Product management and image upload
+4. ✅ Knowledge base
+5. ✅ AI assistant (grounded retrieval, conversation history)
 6. Customer management
 7. Order management and inventory
 8. Dashboard analytics
 9. Localization and responsive polish
 10. Security tests, error handling, deployment prep
-
-
-
 

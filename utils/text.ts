@@ -12,3 +12,10 @@ export function initialsOf(name: string): string {
   const picked = words.length === 1 ? [words[0]!] : [words[0]!, words[words.length - 1]!];
   return picked.map(firstGrapheme).join("").toUpperCase();
 }
+
+/** Shortens text to `max` user-visible characters without splitting Khmer clusters. */
+export function truncateGraphemes(text: string, max: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(clean)].map((s) => s.segment);
+  return graphemes.length <= max ? clean : `${graphemes.slice(0, max - 1).join("").trimEnd()}…`;
+}

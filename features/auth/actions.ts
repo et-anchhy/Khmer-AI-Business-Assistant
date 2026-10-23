@@ -118,7 +118,8 @@ export async function resetPasswordAction(input: ResetPasswordInput): Promise<Ac
 
 export async function logoutAction(): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.auth.signOut();
+  // "local" ends only this device's session; the default would sign the user out everywhere.
+  const { error } = await supabase.auth.signOut({ scope: "local" });
   if (error) logger.error("auth.logout", "Sign-out failed", error);
   redirect(`${LOGIN_PATH}?notice=signed-out`);
 }

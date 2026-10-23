@@ -20,11 +20,11 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { key: "dashboard", href: "/dashboard", icon: LayoutDashboard, available: true },
-  { key: "ai", href: "/dashboard/ai", icon: Bot, available: false },
-  { key: "products", href: "/dashboard/products", icon: Package, available: false },
+  { key: "ai", href: "/dashboard/ai", icon: Bot, available: true },
+  { key: "products", href: "/dashboard/products", icon: Package, available: true },
   { key: "orders", href: "/dashboard/orders", icon: ShoppingCart, available: false },
   { key: "customers", href: "/dashboard/customers", icon: Users, available: false },
-  { key: "knowledge", href: "/dashboard/knowledge", icon: BookOpen, available: false },
+  { key: "knowledge", href: "/dashboard/knowledge", icon: BookOpen, available: true },
   { key: "settings", href: "/dashboard/settings", icon: Settings, available: true },
 ];
 

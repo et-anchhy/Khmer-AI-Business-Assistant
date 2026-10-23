@@ -285,6 +285,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       is_business_owner: { Args: { target_business_id: string }; Returns: boolean };
+      adjust_product_stock: { Args: { p_product_id: string; p_delta: number }; Returns: number };
     };
     Enums: {
       business_language: "km" | "en" | "km_en";
@@ -310,3 +311,4 @@ export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema[
 export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"][T];
 
 export type Business = Tables<"businesses">;
+export type Product = Tables<"products">;

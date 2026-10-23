@@ -12,6 +12,12 @@ function required(name: string): string {
   return value;
 }
 
+/** True when a real OpenAI key is set (not empty, not the .env.example placeholder). */
+export function isAiConfigured(): boolean {
+  const key = process.env.OPENAI_API_KEY;
+  return Boolean(key && key.trim() && !key.startsWith("sk-your-"));
+}
+
 export const serverEnv = {
   get supabaseServiceRoleKey() {
     return required("SUPABASE_SERVICE_ROLE_KEY");

@@ -2,7 +2,7 @@
 
 A bilingual (Khmer / English) business workspace for Cambodian small businesses such as clothing shops, online sellers, cafés, beauty salons and electronics shops. Owners manage their business profile, products, customers, orders and a knowledge base. An AI assistant answers questions in Khmer or English using **only that business's own data**.
 
-> **Status: Phases 1–2 of 10 are complete** (setup, UI system, authentication, database schema with RLS, business onboarding and settings). See [Roadmap](#roadmap). Sections marked _(Phase N)_ describe work that is planned but not built yet.
+> **Status: Phases 1–5 of 10 are complete** (setup, UI system, authentication, database schema with RLS, business onboarding and settings, products, knowledge base, AI assistant). See [Roadmap](#roadmap). Sections marked _(Phase N)_ describe work that is planned but not built yet.
 
 ---
 
@@ -17,9 +17,9 @@ A bilingual (Khmer / English) business workspace for Cambodian small businesses 
 | Database schema with Row Level Security, plus cross-business isolation tests | ✅ Phase 2 |
 | Business onboarding and settings                                        | ✅ Phase 2 |
 | Demo seed data (Angkor Fashion)                                         | ✅ Phase 2 |
-| Products with images, stock and low-stock warnings                      | Phase 3    |
-| Knowledge base (FAQ, delivery, return and payment policies)             | Phase 4    |
-| AI assistant grounded in business data, with saved conversations        | Phase 5    |
+| Products: search, filters, photos, stock updates, low-stock warnings | ✅ Phase 3 |
+| Knowledge base: FAQs and policies, search, category filter, guided empty state | ✅ Phase 4 |
+| Bilingual AI assistant grounded in business data, with saved conversations | ✅ Phase 5 |
 | Customers with order history                                            | Phase 6    |
 | Orders with inventory-safe status changes                               | Phase 7    |
 | Dashboard analytics                                                     | Phase 8    |
@@ -87,6 +87,8 @@ Migrations live in `supabase/migrations/` and run in filename order:
 | `…_initial_schema.sql` | Enums, tables, constraints, indexes, `updated_at` triggers, profile-on-signup trigger, per-business order numbers |
 | `…_row_level_security.sql` | `is_business_owner()` helper, RLS policies on every table, column-level grants, no access for `anon` |
 | `…_storage.sql` | `product-images` bucket (5 MB, JPEG/PNG/WebP); uploads allowed only under `<business_id>/` |
+| `…_product_stock.sql` | `adjust_product_stock()`: atomic stock change that respects RLS and never goes below 0 |
+| `…_conversation_activity.sql` | A new message moves its conversation to the top of the list |
 
 **Option A: Supabase CLI**
 
@@ -108,9 +110,26 @@ npm run seed -- --yes
 
 This creates the fictional **Angkor Fashion** business with 8 products, 5 customers, 6 orders and 8 knowledge-base entries, mixing Khmer and English. You can log in as `demo@angkor-fashion.test` with password `angkor-demo-2026` (override it with `SEED_DEMO_PASSWORD`). The script needs the service-role key and refuses to run with `NODE_ENV=production`. Re-running it deletes and recreates the demo business. Use it only in development projects.
 
-## OpenAI setup _(Phase 5)_
+## OpenAI setup
 
-Create a key at [platform.openai.com](https://platform.openai.com/api-keys) and set `OPENAI_API_KEY`. The key is only used server-side.
+1. Create a key at [platform.openai.com](https://platform.openai.com/api-keys).
+2. Set `OPENAI_API_KEY` in `.env.local`, plus `OPENAI_MODEL` if you want a different model.
+3. Restart the server.
+
+The key is read only on the server (`lib/env.server.ts`) and is never sent to the browser. Requests use the Responses API with `store: false`, so OpenAI doesn't keep the conversation. Until a key is set, the AI page explains what's missing and the chat input is disabled.
+
+## How the AI assistant stays grounded
+
+`generateBusinessAnswer()` (`lib/ai/generate-business-answer.ts`) handles every question:
+
+1. **Authorise**: `requireBusiness()` resolves the signed-in owner's business. A business or conversation ID from the request is used only if it belongs to that business.
+2. **Retrieve** (`lib/ai/keyword-retriever.ts`): loads that business's active products and knowledge entries. Both the query scope and RLS restrict this to its own rows.
+3. **Rank** (`lib/ai/search.ts`): English is matched by words, with common words dropped and simple plurals handled. Khmer has no spaces between words, so it's matched by 3-character chunks. Each match is weighted by how rare it is (IDF), so question words like "តើ…ទេ" count for little and words like "ដឹក" count for a lot. The previous question is included so follow-ups like "and in white?" still work.
+4. **Context** (`lib/ai/context.ts`): a compact fact sheet (about 4–12 KB) with the business profile, delivery, payment, hours, matching products (price, stock), a short catalogue and the best knowledge entries. Missing facts are written as "not provided", so the model says it doesn't know instead of guessing.
+5. **Instructions** (`lib/ai/prompt.ts`): the spec's grounding rule, plus a reply-language rule based on the script of the customer's message (Khmer, English or mixed). If the language is unclear, it falls back to the business's preferred language.
+6. **Answer and save**: the question and answer are saved together only after a successful reply, so failures never leave half-saved conversations.
+
+To switch to semantic search later, implement `ContextRetriever` (`lib/ai/retrieval.ts`), for example with pgvector embeddings, and pass it in place of the keyword retriever. Nothing else needs to change.
 
 ## Running locally
 
@@ -120,6 +139,22 @@ npm test             # unit + database tests (Vitest)
 npm run typecheck    # TypeScript
 npm run lint         # ESLint
 ```
+
+### Local Supabase (no cloud account)
+
+With Docker running:
+
+```bash
+npx supabase start     # starts Postgres/Auth/Storage locally and applies all migrations
+```
+
+Copy the printed API URL, publishable key and secret key into `.env.local` as `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. Then run `npm run seed -- --yes` and `npm run dev`.
+
+Other local tools:
+- Studio: http://127.0.0.1:54323
+- Mailpit (catches sign-up and reset emails): http://127.0.0.1:54324
+
+`npx supabase stop` stops the stack and keeps its data.
 
 ### Tests
 
@@ -159,12 +194,17 @@ components/
 features/<feature>/       Feature code: schemas, server actions, components
   auth/
   business/               Onboarding/settings form, schema, actions
+  products/               List, filters, form, photo upload, stock dialog
+  knowledge/              Knowledge-base cards, add/edit dialog, category examples
+  ai/                     Chat panel, conversation list, send/delete actions
   i18n/
 lib/
-  supabase/               Browser, server and proxy Supabase clients
+  supabase/               Browser, server and proxy Supabase clients; safe filter builder
+  uploads/                Image type sniffing and size limits
+  format/                 Money (USD $15.00, KHR 60,000៛) and dates (fixed Cambodia time)
   auth/                   Route rules (pure, tested) and session helpers
   i18n/                   Locale config, dictionaries (en, km), server/client access
-  ai/                     AI service (Phase 5)
+  ai/                     Grounded answering: retrieval, Khmer-aware search, context, prompt, OpenAI
   env.ts / env.server.ts  Validated public config / server-only secrets
 services/                 Data access per domain; takes the request's RLS-bound client
 types/database.ts         Typed schema for supabase-js
@@ -181,12 +221,16 @@ UI strings live in `lib/i18n/dictionaries/`. `en.ts` defines the shape and `km.t
 
 ## Security model
 
+- **AI isolation**: the AI retriever only ever loads rows for the session's business, and RLS enforces the same rule underneath. In the live end-to-end test, a second business's products and FAQs never appeared in the first business's prompts.
+
 - **Proxy (`proxy.ts`)** refreshes the session and redirects signed-out users. This is only an optimistic check.
 - **Server-side checks**: protected layouts, pages and actions call `requireUser()` / `requireBusiness()`. These verify the session with Supabase Auth and load the user's business. Server code takes the business ID only from there, never from the request.
 - **Database (the real boundary)**: RLS is enabled on every table. A row is visible or writable only when `is_business_owner(business_id)` is true. `anon` has no table access.
 - **Composite foreign keys**: child rows reference `(id, business_id)` of their parent, so an order item, message or order can't point at another business's data.
 - **Column grants**: owners can't change `owner_id` or the order counter, and order numbers are always assigned by a trigger.
-- **Storage**: uploads must sit under the uploader's own `<business_id>/` folder.
+- **Storage**: uploads must sit under the uploader's own `<business_id>/` folder. The server checks an image's real type from its first bytes rather than trusting its name or MIME type, and rejects files over 5 MB.
+- **Search input** is escaped before it goes into PostgREST `or=(…)` filters (`lib/supabase/filters.ts`), so typed text can't add filter conditions.
+- **Stock** only changes through `adjust_product_stock()` or "set exact count", never by saving the edit form. That prevents stale forms from overwriting newer stock numbers.
 - `?next=` redirects are restricted to same-origin paths (`safeRedirectPath`), so they cannot be used as open redirects.
 - The forgot-password flow gives the same response whether or not an account exists, so it cannot be used to discover emails.
 - Users see friendly error messages. Details are logged server-side via `lib/logger.ts`, without passwords or tokens.

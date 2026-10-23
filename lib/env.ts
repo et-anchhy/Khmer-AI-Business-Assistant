@@ -18,6 +18,14 @@ const publicEnvSchema = z.object({
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 
+/** Thrown when required configuration is missing; lists variable names only, never values. */
+export class EnvError extends Error {
+  constructor(public readonly variables: string[], message: string) {
+    super(message);
+    this.name = "EnvError";
+  }
+}
+
 let cached: PublicEnv | undefined;
 
 export function getPublicEnv(): PublicEnv {
@@ -31,7 +39,10 @@ export function getPublicEnv(): PublicEnv {
 
   if (!parsed.success) {
     const problems = parsed.error.issues.map((issue) => `${issue.path.join(".")} (${issue.message})`).join(", ");
-    throw new Error(`Invalid or missing environment variables: ${problems}. Set them in .env.local — see .env.example.`);
+    throw new EnvError(
+      parsed.error.issues.map((issue) => issue.path.join(".")),
+      `Invalid or missing environment variables: ${problems}. Set them in .env.local — see .env.example.`,
+    );
   }
 
   cached = parsed.data;
